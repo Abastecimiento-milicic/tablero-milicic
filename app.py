@@ -490,15 +490,8 @@ st.markdown(f"<div class='main-title'>Control de Partidas Abiertas SAP - Cuenta 
 st.markdown(f"<div class='sub-title'>Cuenta de Compensación <b>2101011001</b> | Corte al <b>{corte_timestamp.strftime('%d/%m/%Y')}</b> | Fuentes: <b>PARTIDAS MLAR.xlsx</b> y <b>PARTIDAS MMAR.xlsx</b></div>", unsafe_allow_html=True)
 
 # ------------------------------------------------------------------------------
-# 5. TABLA DE TODAS LAS POSICIONES
+# 5. TABLA DE TODAS LAS POSICIONES Y DESCARGA
 # ------------------------------------------------------------------------------
-c_title, c_rows = st.columns([3, 1])
-with c_title:
-    st.markdown(f"### 📑 Todas las Posiciones ({len(filtered):,d})")
-with c_rows:
-    filas_opciones = [10, 25, 50, 100, 250, "Todas"]
-    cant_filas = st.selectbox("Filas en pantalla:", filas_opciones, index=filas_opciones.index("Todas"))
-
 cols_display = [
     'Sociedad',
     'Pedido',
@@ -514,6 +507,54 @@ cols_display = [
     'Fecha_Entrega_OC',
     'Estado_Vencimiento'
 ]
+
+rename_cols_excel = {
+    'Sociedad': 'Sociedad',
+    'Pedido': 'Pedido',
+    'Posicion': 'POS',
+    'Proveedor': 'Proveedor',
+    'Grupo_Compras': 'GC',
+    'Operador_OC': 'Operador_OC',
+    'Fe_Contabilizacion': 'FE CONT.',
+    'Dias_Atraso': 'Dias_Atraso',
+    'Total_Debe': 'Facturado (Debe)',
+    'Total_Haber': 'Recepcionado (Haber)',
+    'Saldo_Neto': 'Saldo_Neto',
+    'Fecha_Entrega_OC': 'FE OC',
+    'Estado_Vencimiento': 'ESTADO'
+}
+
+# Preparar archivo Excel para descarga inmediata
+output = io.BytesIO()
+df_excel = filtered[cols_display].rename(columns=rename_cols_excel).copy()
+with pd.ExcelWriter(output, engine='openpyxl') as writer:
+    df_excel.to_excel(writer, index=False, sheet_name='Posiciones_Filtradas')
+    ws = writer.sheets['Posiciones_Filtradas']
+    date_cols = ['FE CONT.', 'FE OC']
+    for col_name in date_cols:
+        if col_name in df_excel.columns:
+            col_idx = list(df_excel.columns).index(col_name) + 1
+            for row_idx in range(2, len(df_excel) + 2):
+                cell = ws.cell(row=row_idx, column=col_idx)
+                if cell.value is not None:
+                    cell.number_format = 'DD/MM/YYYY'
+excel_bytes = output.getvalue()
+timestamp_str = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+
+c_title, c_rows = st.columns([3, 1.2])
+with c_title:
+    st.markdown(f"### 📑 Todas las Posiciones ({len(filtered):,d})")
+with c_rows:
+    st.download_button(
+        label="📥 Descargar Reporte en Excel",
+        data=excel_bytes,
+        file_name=f"CONTROL_EM_RF_{sel_soc}_{timestamp_str}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        width='stretch',
+        type='primary'
+    )
+    filas_opciones = [10, 25, 50, 100, 250, "Todas"]
+    cant_filas = st.selectbox("Filas en pantalla:", filas_opciones, index=filas_opciones.index("Todas"))
 
 # Configuración visual para st.dataframe
 col_config_dict = {
@@ -548,53 +589,3 @@ if cant_filas == "Todas":
     st.caption(f"Mostrando el 100% de las posiciones filtradas ({len(df_mostrar):,d} registros).")
 else:
     st.caption(f"Mostrando las primeras {len(df_mostrar):,d} de {len(filtered):,d} posiciones filtradas. (Selecciona **'Todas'** en el menú superior para ver y recorrer todas las posiciones según el filtro).")
-
-# ------------------------------------------------------------------------------
-# 6. EXPORTACIÓN A EXCEL
-# ------------------------------------------------------------------------------
-st.markdown("---")
-c_exp1, c_exp2 = st.columns([3, 1])
-
-with c_exp1:
-    st.markdown("**Exportar Reporte a Excel:** Descarga un archivo con las posiciones filtradas y las columnas visibles.")
-
-with c_exp2:
-    output = io.BytesIO()
-    rename_cols_excel = {
-        'Sociedad': 'Sociedad',
-        'Pedido': 'Pedido',
-        'Posicion': 'POS',
-        'Proveedor': 'Proveedor',
-        'Grupo_Compras': 'GC',
-        'Operador_OC': 'Operador_OC',
-        'Fe_Contabilizacion': 'FE CONT.',
-        'Dias_Atraso': 'Dias_Atraso',
-        'Total_Debe': 'Facturado (Debe)',
-        'Total_Haber': 'Recepcionado (Haber)',
-        'Saldo_Neto': 'Saldo_Neto',
-        'Fecha_Entrega_OC': 'FE OC',
-        'Estado_Vencimiento': 'ESTADO'
-    }
-    df_excel = filtered[cols_display].rename(columns=rename_cols_excel).copy()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df_excel.to_excel(writer, index=False, sheet_name='Posiciones_Filtradas')
-        ws = writer.sheets['Posiciones_Filtradas']
-        date_cols = ['FE CONT.', 'FE OC']
-        for col_name in date_cols:
-            if col_name in df_excel.columns:
-                col_idx = list(df_excel.columns).index(col_name) + 1
-                for row_idx in range(2, len(df_excel) + 2):
-                    cell = ws.cell(row=row_idx, column=col_idx)
-                    if cell.value is not None:
-                        cell.number_format = 'DD/MM/YYYY'
-    excel_bytes = output.getvalue()
-    
-    timestamp_str = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-    st.download_button(
-        label="📥 Descargar Reporte en Excel",
-        data=excel_bytes,
-        file_name=f"CONTROL_EM_RF_{sel_soc}_{timestamp_str}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        width='stretch',
-        type='primary'
-    )
