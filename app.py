@@ -10,6 +10,7 @@ import io
 import datetime
 import unicodedata
 import os
+import json
 import plotly.express as px
 import plotly.graph_objects as go
 
@@ -30,6 +31,8 @@ st.markdown("""
         font-size: 1.8rem;
         font-weight: 700;
         color: #1B365D;
+        line-height: 1.35;
+        margin-top: 0.5rem;
         margin-bottom: 0.2rem;
     }
     .sub-title {
@@ -37,75 +40,108 @@ st.markdown("""
         font-size: 0.95rem;
         margin-bottom: 1.2rem;
     }
+    /* Contenedor principal: margen superior e izquierdo amplio para que no se recorte el título */
+    .block-container {
+        padding-top: 4.5rem !important;
+        padding-bottom: 2rem !important;
+        padding-left: 4.5rem !important;
+        padding-right: 2rem !important;
+        max-width: 100% !important;
+    }
     /* ==========================================================================
-       BARRA DE DESPLAZAMIENTO DESTACADA Y LLAMATIVA
+       BARRA DE DESPLAZAMIENTO VERTICAL EN AZUL Y TABLA COMPLETA
        ========================================================================== */
+    /* Permitir que la tabla sea visible y no recorte contenido ni la barra de herramientas */
+    [data-testid="stDataFrame"] {
+        overflow: visible !important;
+        width: 100% !important;
+    }
+
+    /* Soporte estándar moderno (Chrome 121+, Edge, Firefox): Scrollbar vertical azul */
     * {
-        scrollbar-width: thin;
-        scrollbar-color: #2563EB #DBEAFE;
+        scrollbar-color: #2563EB #EFF6FF !important;
     }
 
+    [data-testid="stDataFrame"],
+    [data-testid="stDataFrame"] *,
+    [class*="dvn-"],
+    [class*="dvn-"] * {
+        scrollbar-color: #2563EB #EFF6FF !important;
+    }
+
+    /* Barra horizontal sutil solo si la pantalla es menor al ancho de la tabla */
+    ::-webkit-scrollbar:horizontal,
+    [data-testid="stDataFrame"] ::-webkit-scrollbar:horizontal,
+    [data-testid="stDataFrame"] *::-webkit-scrollbar:horizontal,
+    [class*="dvn-"]::-webkit-scrollbar:horizontal,
+    [class*="dvn-"] *::-webkit-scrollbar:horizontal {
+        height: 6px !important;
+    }
+
+    ::-webkit-scrollbar-thumb:horizontal,
+    [data-testid="stDataFrame"] ::-webkit-scrollbar-thumb:horizontal,
+    [data-testid="stDataFrame"] *::-webkit-scrollbar-thumb:horizontal,
+    [class*="dvn-"]::-webkit-scrollbar-thumb:horizontal,
+    [class*="dvn-"] *::-webkit-scrollbar-thumb:horizontal {
+        background: #BFDBFE !important;
+        border-radius: 4px !important;
+    }
+
+    /* Barra vertical azul en navegadores WebKit */
     ::-webkit-scrollbar {
-        width: 16px !important;
-        height: 16px !important;
+        width: 12px !important;
+        height: 0px !important;
     }
 
-    ::-webkit-scrollbar-track {
+    ::-webkit-scrollbar:vertical {
+        width: 12px !important;
+    }
+
+    ::-webkit-scrollbar-track:vertical {
         background: #EFF6FF !important;
-        border-radius: 8px !important;
+        border-radius: 6px !important;
         border: 1px solid #BFDBFE !important;
     }
 
-    ::-webkit-scrollbar-thumb {
-        background: linear-gradient(180deg, #2563EB, #1D4ED8) !important;
-        border-radius: 8px !important;
-        border: 2px solid #EFF6FF !important;
-        box-shadow: 0 0 6px rgba(37, 99, 235, 0.5) !important;
-    }
-
-    ::-webkit-scrollbar-thumb:hover {
-        background: #1E40AF !important;
-    }
-
-    /* Reglas específicas para la tabla de Streamlit */
-    [data-testid="stDataFrame"],
-    [data-testid="stDataFrame"] *,
-    [class*="dvn-scroller"],
-    [class*="dvn-"] {
-        scrollbar-color: #2563EB #DBEAFE !important;
-    }
-
-    [data-testid="stDataFrame"] ::-webkit-scrollbar,
-    [data-testid="stDataFrame"] *::-webkit-scrollbar,
-    [class*="dvn-"]::-webkit-scrollbar,
-    [class*="dvn-"] *::-webkit-scrollbar {
-        width: 16px !important;
-        height: 16px !important;
-    }
-
-    [data-testid="stDataFrame"] ::-webkit-scrollbar-track,
-    [data-testid="stDataFrame"] *::-webkit-scrollbar-track,
-    [class*="dvn-"]::-webkit-scrollbar-track,
-    [class*="dvn-"] *::-webkit-scrollbar-track {
-        background: #DBEAFE !important;
-        border-radius: 8px !important;
-        border: 1px solid #93C5FD !important;
-    }
-
-    [data-testid="stDataFrame"] ::-webkit-scrollbar-thumb,
-    [data-testid="stDataFrame"] *::-webkit-scrollbar-thumb,
-    [class*="dvn-"]::-webkit-scrollbar-thumb,
-    [class*="dvn-"] *::-webkit-scrollbar-thumb {
+    ::-webkit-scrollbar-thumb:vertical {
         background: #2563EB !important;
-        border-radius: 8px !important;
-        border: 2px solid #DBEAFE !important;
-        box-shadow: 0 0 8px rgba(37, 99, 235, 0.6) !important;
+        border-radius: 6px !important;
+        border: 2px solid #EFF6FF !important;
     }
 
-    [data-testid="stDataFrame"] ::-webkit-scrollbar-thumb:hover,
-    [data-testid="stDataFrame"] *::-webkit-scrollbar-thumb:hover,
-    [class*="dvn-"]::-webkit-scrollbar-thumb:hover,
-    [class*="dvn-"] *::-webkit-scrollbar-thumb:hover {
+    ::-webkit-scrollbar-thumb:vertical:hover {
+        background: #1D4ED8 !important;
+    }
+
+    [data-testid="stDataFrame"] ::-webkit-scrollbar:vertical,
+    [data-testid="stDataFrame"] *::-webkit-scrollbar:vertical,
+    [class*="dvn-"]::-webkit-scrollbar:vertical,
+    [class*="dvn-"] *::-webkit-scrollbar:vertical {
+        width: 12px !important;
+    }
+
+    [data-testid="stDataFrame"] ::-webkit-scrollbar-track:vertical,
+    [data-testid="stDataFrame"] *::-webkit-scrollbar-track:vertical,
+    [class*="dvn-"]::-webkit-scrollbar-track:vertical,
+    [class*="dvn-"] *::-webkit-scrollbar-track:vertical {
+        background: #EFF6FF !important;
+        border-radius: 6px !important;
+        border: 1px solid #BFDBFE !important;
+    }
+
+    [data-testid="stDataFrame"] ::-webkit-scrollbar-thumb:vertical,
+    [data-testid="stDataFrame"] *::-webkit-scrollbar-thumb:vertical,
+    [class*="dvn-"]::-webkit-scrollbar-thumb:vertical,
+    [class*="dvn-"] *::-webkit-scrollbar-thumb:vertical {
+        background: #2563EB !important;
+        border-radius: 6px !important;
+        border: 2px solid #EFF6FF !important;
+    }
+
+    [data-testid="stDataFrame"] ::-webkit-scrollbar-thumb:vertical:hover,
+    [data-testid="stDataFrame"] *::-webkit-scrollbar-thumb:vertical:hover,
+    [class*="dvn-"]::-webkit-scrollbar-thumb:vertical:hover,
+    [class*="dvn-"] *::-webkit-scrollbar-thumb:vertical:hover {
         background: #1D4ED8 !important;
     }
 
@@ -152,11 +188,21 @@ def clean_col(c):
 
 @st.cache_data(show_spinner=False)
 def load_raw_data():
+    base_dir = os.path.dirname(os.path.abspath(__file__))
     sociedades = [
-        ('MLAR', 'PARTIDAS MLAR.xlsx'),
-        ('MMAR', 'PARTIDAS MMAR.xlsx')
+        ('MLAR', os.path.join(base_dir, 'PARTIDAS MLAR.xlsx')),
+        ('MMAR', os.path.join(base_dir, 'PARTIDAS MMAR.xlsx'))
     ]
     
+    op_map = {}
+    map_path = os.path.join(base_dir, 'operadores_map.json')
+    if os.path.exists(map_path):
+        try:
+            with open(map_path, 'r', encoding='utf-8') as f_op:
+                op_map = json.load(f_op)
+        except Exception:
+            pass
+
     docs_list = []
     
     for soc, fpath in sociedades:
@@ -189,19 +235,39 @@ def load_raw_data():
         
         # Fechas
         raw['Fecha_Doc'] = pd.to_datetime(raw.get('fecha de documento'), errors='coerce', dayfirst=True)
+        raw['Fe_Contabilizacion'] = pd.to_datetime(raw.get('fe.contabilizacion', raw.get('fecha de contabilizacion', pd.Series(pd.NaT, index=raw.index))), errors='coerce', dayfirst=True)
+        raw['Clave_Referencia'] = raw.get('clave de referencia', raw.get('referencia', raw.get('asignacion', pd.Series('', index=raw.index)))).fillna('').astype(str).str.strip()
         raw['Fecha_Emision_OC'] = pd.to_datetime(raw.get('fecha emision oc'), errors='coerce', dayfirst=True)
-        raw['Fecha_Entrega_OC'] = pd.to_datetime(raw.get('fecha entrega oc'), errors='coerce', dayfirst=True)
+        
+        f_entrega = raw.get('fecha de entrega', raw.get('fecha entrega oc', raw.get('fecha de entrega oc', pd.Series(pd.NaT, index=raw.index))))
+        raw['Fecha_Entrega_OC'] = pd.to_datetime(f_entrega, errors='coerce', dayfirst=True)
         raw['Fecha_Aprobacion_OC'] = pd.to_datetime(raw.get('fecha aprobacion final oc'), errors='coerce', dayfirst=True)
         raw['Primera_Fecha_Entrega_OC'] = pd.to_datetime(raw.get('primera fecha entrega oc'), errors='coerce', dayfirst=True)
         
         # Proveedor y Operadores
-        raw['Proveedor'] = raw.get('proveedor', pd.Series('', index=raw.index)).fillna(raw.get('nombre', '')).fillna('DESCONOCIDO').astype(str).str.strip()
-        raw['Operador_OC'] = raw.get('operador oc', pd.Series('', index=raw.index)).fillna('SIN ASIGNAR').astype(str).str.strip()
-        raw['Operador_VA'] = raw.get('operador de va', pd.Series('', index=raw.index)).fillna('SIN ASIGNAR').astype(str).str.strip()
+        prov_series = raw.get('nombre', raw.get('proveedor', raw.get('proveedor/centro suministrador', pd.Series('', index=raw.index))))
+        raw['Proveedor'] = prov_series.fillna('DESCONOCIDO').astype(str).str.strip()
+        
+        # Operador OC: usar columna si existe con datos, o buscar en op_map
+        if 'operador oc' in raw.columns and raw['operador oc'].dropna().astype(str).str.strip().ne('').any():
+            raw['Operador_OC'] = raw['operador oc'].fillna(raw['Key'].map(op_map)).fillna('SIN ASIGNAR').astype(str).str.strip()
+        elif 'operador_oc' in raw.columns and raw['operador_oc'].dropna().astype(str).str.strip().ne('').any():
+            raw['Operador_OC'] = raw['operador_oc'].fillna(raw['Key'].map(op_map)).fillna('SIN ASIGNAR').astype(str).str.strip()
+        else:
+            raw['Operador_OC'] = raw['Key'].map(op_map).fillna('SIN ASIGNAR').astype(str).str.strip()
+            
+        raw['Operador_OC'] = raw['Operador_OC'].replace({'nan': 'SIN ASIGNAR', '': 'SIN ASIGNAR', 'None': 'SIN ASIGNAR'})
+        mask_sin = raw['Operador_OC'] == 'SIN ASIGNAR'
+        if mask_sin.any():
+            fallback_map = raw.loc[mask_sin, 'Key'].map(op_map)
+            raw.loc[mask_sin, 'Operador_OC'] = fallback_map.fillna('SIN ASIGNAR')
+            
+        raw['Operador_VA'] = raw.get('operador de va', raw.get('operador_va', pd.Series('SIN ASIGNAR', index=raw.index))).fillna('SIN ASIGNAR').astype(str).str.strip()
         
         # División y Grupo de Compras
         raw['Division'] = raw.get('division', pd.Series('S/D', index=raw.index)).fillna('S/D').astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
-        raw['Grupo_Compras'] = raw.get('grupo de compra oc', pd.Series('SIN GRUPO', index=raw.index)).fillna('SIN GRUPO').astype(str).str.strip()
+        gc_series = raw.get('grupo de compras', raw.get('grupo de compra oc', raw.get('grupo compras', pd.Series('SIN GRUPO', index=raw.index))))
+        raw['Grupo_Compras'] = gc_series.fillna('SIN GRUPO').astype(str).str.strip()
         
         docs_list.append(raw)
         
@@ -231,8 +297,10 @@ def build_grouped_positions(df_docs, today_date):
         Operador_VA=('Operador_VA', lambda s: first_valid(s, 'SIN ASIGNAR')),
         Division=('Division', join_divisions),
         Grupo_Compras=('Grupo_Compras', lambda s: first_valid(s, 'SIN GRUPO')),
+        Fe_Contabilizacion=('Fe_Contabilizacion', lambda s: s.dropna().max() if len(s.dropna()) > 0 else pd.NaT),
+        Clave_Referencia=('Clave_Referencia', lambda s: first_valid(s, '')),
         Fecha_Emision_OC=('Fecha_Emision_OC', 'first'),
-        Fecha_Entrega_OC=('Fecha_Entrega_OC', 'first'),
+        Fecha_Entrega_OC=('Fecha_Entrega_OC', lambda s: s.dropna().iloc[0] if len(s.dropna()) > 0 else pd.NaT),
         Fecha_Aprobacion_OC=('Fecha_Aprobacion_OC', 'first'),
         Cant_Docs=('Clase_Doc', 'count'),
         Total_Debe=('Importe', lambda s: s[s > 0].sum()),
@@ -424,35 +492,62 @@ st.markdown(f"<div class='sub-title'>Cuenta de Compensación <b>2101011001</b> |
 # ------------------------------------------------------------------------------
 # 5. TABLA DE TODAS LAS POSICIONES
 # ------------------------------------------------------------------------------
-st.markdown(f"### 📑 Todas las Posiciones ({len(filtered):,d})")
+c_title, c_rows = st.columns([3, 1])
+with c_title:
+    st.markdown(f"### 📑 Todas las Posiciones ({len(filtered):,d})")
+with c_rows:
+    filas_opciones = [10, 25, 50, 100, 250, "Todas"]
+    cant_filas = st.selectbox("Filas en pantalla:", filas_opciones, index=filas_opciones.index("Todas"))
 
 cols_display = [
-    'Sociedad', 'Pedido', 'Posicion', 'Proveedor', 'Grupo_Compras',
-    'Operador_OC', 'Operador_VA',
-    'Fecha_Entrega_OC', 'Dias_Atraso', 'Estado_Vencimiento',
-    'Total_Debe', 'Total_Haber', 'Saldo_Neto',
-    'Cant_Docs', 'Clases_Doc'
+    'Sociedad',
+    'Pedido',
+    'Posicion',
+    'Proveedor',
+    'Grupo_Compras',
+    'Operador_OC',
+    'Fe_Contabilizacion',
+    'Dias_Atraso',
+    'Total_Debe',
+    'Total_Haber',
+    'Saldo_Neto',
+    'Fecha_Entrega_OC',
+    'Estado_Vencimiento'
 ]
 
 # Configuración visual para st.dataframe
 col_config_dict = {
-    'Total_Debe': st.column_config.NumberColumn("Facturado (Debe)", format="$ %.2f"),
-    'Total_Haber': st.column_config.NumberColumn("Recepcionado (Haber)", format="$ %.2f"),
-    'Saldo_Neto': st.column_config.NumberColumn("Saldo Neto", format="$ %.2f"),
-    'Fecha_Entrega_OC': st.column_config.DateColumn("Fecha Entrega OC", format="DD/MM/YYYY"),
-    'Dias_Atraso': st.column_config.NumberColumn("Días Atraso", format="%d"),
-    'Cant_Docs': st.column_config.NumberColumn("Asientos", format="%d"),
-    'Operador_OC': st.column_config.TextColumn("Operador OC"),
-    'Operador_VA': st.column_config.TextColumn("Operador VA")
+    'Sociedad': st.column_config.TextColumn("Sociedad", width=75),
+    'Pedido': st.column_config.TextColumn("Pedido", width=95),
+    'Posicion': st.column_config.TextColumn("POS", width=50),
+    'Proveedor': st.column_config.TextColumn("Proveedor", width=170),
+    'Grupo_Compras': st.column_config.TextColumn("GC", width=45),
+    'Operador_OC': st.column_config.TextColumn("Operador_OC", width=105),
+    'Fe_Contabilizacion': st.column_config.DateColumn("FE CONT.", format="DD/MM/YYYY", width=95),
+    'Dias_Atraso': st.column_config.NumberColumn("Dias_Atraso", format="%d", width=90),
+    'Total_Debe': st.column_config.NumberColumn("Facturado (Debe)", format="$ %.2f", alignment="left", width=125),
+    'Total_Haber': st.column_config.NumberColumn("Recepcionado (Haber)", format="$ %.2f", alignment="left", width=135),
+    'Saldo_Neto': st.column_config.NumberColumn("Saldo_Neto", format="$ %.2f", alignment="left", width=115),
+    'Fecha_Entrega_OC': st.column_config.DateColumn("FE OC", format="DD/MM/YYYY", width=85),
+    'Estado_Vencimiento': st.column_config.TextColumn("ESTADO", width=85)
 }
 
+if cant_filas == "Todas":
+    df_mostrar = filtered[cols_display]
+else:
+    df_mostrar = filtered[cols_display].head(int(cant_filas))
+
 st.dataframe(
-    filtered[cols_display],
+    df_mostrar,
     column_config=col_config_dict,
     width='stretch',
-    height=420
+    hide_index=True
 )
-st.caption(f"Mostrando {len(filtered):,d} posiciones filtradas | Puedes desplazarte verticalmente hacia abajo con la rueda del mouse o la barra azul lateral.")
+
+if cant_filas == "Todas":
+    st.caption(f"Mostrando el 100% de las posiciones filtradas ({len(df_mostrar):,d} registros).")
+else:
+    st.caption(f"Mostrando las primeras {len(df_mostrar):,d} de {len(filtered):,d} posiciones filtradas. (Selecciona **'Todas'** en el menú superior para ver y recorrer todas las posiciones según el filtro).")
 
 # ------------------------------------------------------------------------------
 # 6. EXPORTACIÓN A EXCEL
@@ -465,8 +560,33 @@ with c_exp1:
 
 with c_exp2:
     output = io.BytesIO()
+    rename_cols_excel = {
+        'Sociedad': 'Sociedad',
+        'Pedido': 'Pedido',
+        'Posicion': 'POS',
+        'Proveedor': 'Proveedor',
+        'Grupo_Compras': 'GC',
+        'Operador_OC': 'Operador_OC',
+        'Fe_Contabilizacion': 'FE CONT.',
+        'Dias_Atraso': 'Dias_Atraso',
+        'Total_Debe': 'Facturado (Debe)',
+        'Total_Haber': 'Recepcionado (Haber)',
+        'Saldo_Neto': 'Saldo_Neto',
+        'Fecha_Entrega_OC': 'FE OC',
+        'Estado_Vencimiento': 'ESTADO'
+    }
+    df_excel = filtered[cols_display].rename(columns=rename_cols_excel).copy()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        filtered[cols_display].to_excel(writer, index=False, sheet_name='Posiciones_Filtradas')
+        df_excel.to_excel(writer, index=False, sheet_name='Posiciones_Filtradas')
+        ws = writer.sheets['Posiciones_Filtradas']
+        date_cols = ['FE CONT.', 'FE OC']
+        for col_name in date_cols:
+            if col_name in df_excel.columns:
+                col_idx = list(df_excel.columns).index(col_name) + 1
+                for row_idx in range(2, len(df_excel) + 2):
+                    cell = ws.cell(row=row_idx, column=col_idx)
+                    if cell.value is not None:
+                        cell.number_format = 'DD/MM/YYYY'
     excel_bytes = output.getvalue()
     
     timestamp_str = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
