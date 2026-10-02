@@ -21,7 +21,7 @@ st.set_page_config(
     page_title="Control EM/RF SAP - MLAR y MMAR",
     page_icon="⚖️",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="auto"
 )
 
 # Estilos CSS personalizados
@@ -40,12 +40,12 @@ st.markdown("""
         font-size: 0.95rem;
         margin-bottom: 1.2rem;
     }
-    /* Contenedor principal: margen superior e izquierdo amplio para que no se recorte el título */
+    /* Contenedor principal: margen optimizado para aprovechar al máximo el ancho de la pantalla */
     .block-container {
-        padding-top: 4.5rem !important;
+        padding-top: 4rem !important;
         padding-bottom: 2rem !important;
-        padding-left: 4.5rem !important;
-        padding-right: 2rem !important;
+        padding-left: 2.5rem !important;
+        padding-right: 1.5rem !important;
         max-width: 100% !important;
     }
     /* ==========================================================================
@@ -517,19 +517,19 @@ cols_display = [
 
 # Configuración visual para st.dataframe
 col_config_dict = {
-    'Sociedad': st.column_config.TextColumn("Sociedad", width=75),
-    'Pedido': st.column_config.TextColumn("Pedido", width=95),
-    'Posicion': st.column_config.TextColumn("POS", width=50),
-    'Proveedor': st.column_config.TextColumn("Proveedor", width=170),
+    'Sociedad': st.column_config.TextColumn("Sociedad", width=65),
+    'Pedido': st.column_config.TextColumn("Pedido", width=90),
+    'Posicion': st.column_config.TextColumn("POS", width=45),
+    'Proveedor': st.column_config.TextColumn("Proveedor", width=145),
     'Grupo_Compras': st.column_config.TextColumn("GC", width=45),
-    'Operador_OC': st.column_config.TextColumn("Operador_OC", width=105),
-    'Fe_Contabilizacion': st.column_config.DateColumn("FE CONT.", format="DD/MM/YYYY", width=95),
-    'Dias_Atraso': st.column_config.NumberColumn("Dias_Atraso", format="%d", width=90),
-    'Total_Debe': st.column_config.NumberColumn("Facturado (Debe)", format="$ %.2f", alignment="left", width=125),
-    'Total_Haber': st.column_config.NumberColumn("Recepcionado (Haber)", format="$ %.2f", alignment="left", width=135),
-    'Saldo_Neto': st.column_config.NumberColumn("Saldo_Neto", format="$ %.2f", alignment="left", width=115),
-    'Fecha_Entrega_OC': st.column_config.DateColumn("FE OC", format="DD/MM/YYYY", width=85),
-    'Estado_Vencimiento': st.column_config.TextColumn("ESTADO", width=85)
+    'Operador_OC': st.column_config.TextColumn("Operador_OC", width=95),
+    'Fe_Contabilizacion': st.column_config.DateColumn("FE CONT.", format="DD/MM/YYYY", width=85),
+    'Dias_Atraso': st.column_config.NumberColumn("Dias_Atraso", format="%d", width=80),
+    'Total_Debe': st.column_config.NumberColumn("Facturado (Debe)", format="$ %.2f", alignment="left", width=110),
+    'Total_Haber': st.column_config.NumberColumn("Recepcionado (Haber)", format="$ %.2f", alignment="left", width=120),
+    'Saldo_Neto': st.column_config.NumberColumn("Saldo_Neto", format="$ %.2f", alignment="left", width=100),
+    'Fecha_Entrega_OC': st.column_config.DateColumn("FE OC", format="DD/MM/YYYY", width=80),
+    'Estado_Vencimiento': st.column_config.TextColumn("ESTADO", width=80)
 }
 
 if cant_filas == "Todas":
