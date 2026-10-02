@@ -1,0 +1,480 @@
+# ==============================================================================
+# CONTROL DE PARTIDAS ABIERTAS SAP - CUENTA EM/RF (2101011001)
+# Bases de Datos: PARTIDAS MLAR.xlsx y PARTIDAS MMAR.xlsx
+# ==============================================================================
+
+import streamlit as st
+import pandas as pd
+import numpy as np
+import io
+import datetime
+import unicodedata
+import os
+import plotly.express as px
+import plotly.graph_objects as go
+
+# ------------------------------------------------------------------------------
+# 1. CONFIGURACIÓN DE PÁGINA Y ESTILOS
+# ------------------------------------------------------------------------------
+st.set_page_config(
+    page_title="Control EM/RF SAP - MLAR y MMAR",
+    page_icon="⚖️",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Estilos CSS personalizados
+st.markdown("""
+    <style>
+    .main-title {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #1B365D;
+        margin-bottom: 0.2rem;
+    }
+    .sub-title {
+        color: #475569;
+        font-size: 0.95rem;
+        margin-bottom: 1.2rem;
+    }
+    /* ==========================================================================
+       BARRA DE DESPLAZAMIENTO DESTACADA Y LLAMATIVA
+       ========================================================================== */
+    * {
+        scrollbar-width: thin;
+        scrollbar-color: #2563EB #DBEAFE;
+    }
+
+    ::-webkit-scrollbar {
+        width: 16px !important;
+        height: 16px !important;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: #EFF6FF !important;
+        border-radius: 8px !important;
+        border: 1px solid #BFDBFE !important;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: linear-gradient(180deg, #2563EB, #1D4ED8) !important;
+        border-radius: 8px !important;
+        border: 2px solid #EFF6FF !important;
+        box-shadow: 0 0 6px rgba(37, 99, 235, 0.5) !important;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: #1E40AF !important;
+    }
+
+    /* Reglas específicas para la tabla de Streamlit */
+    [data-testid="stDataFrame"],
+    [data-testid="stDataFrame"] *,
+    [class*="dvn-scroller"],
+    [class*="dvn-"] {
+        scrollbar-color: #2563EB #DBEAFE !important;
+    }
+
+    [data-testid="stDataFrame"] ::-webkit-scrollbar,
+    [data-testid="stDataFrame"] *::-webkit-scrollbar,
+    [class*="dvn-"]::-webkit-scrollbar,
+    [class*="dvn-"] *::-webkit-scrollbar {
+        width: 16px !important;
+        height: 16px !important;
+    }
+
+    [data-testid="stDataFrame"] ::-webkit-scrollbar-track,
+    [data-testid="stDataFrame"] *::-webkit-scrollbar-track,
+    [class*="dvn-"]::-webkit-scrollbar-track,
+    [class*="dvn-"] *::-webkit-scrollbar-track {
+        background: #DBEAFE !important;
+        border-radius: 8px !important;
+        border: 1px solid #93C5FD !important;
+    }
+
+    [data-testid="stDataFrame"] ::-webkit-scrollbar-thumb,
+    [data-testid="stDataFrame"] *::-webkit-scrollbar-thumb,
+    [class*="dvn-"]::-webkit-scrollbar-thumb,
+    [class*="dvn-"] *::-webkit-scrollbar-thumb {
+        background: #2563EB !important;
+        border-radius: 8px !important;
+        border: 2px solid #DBEAFE !important;
+        box-shadow: 0 0 8px rgba(37, 99, 235, 0.6) !important;
+    }
+
+    [data-testid="stDataFrame"] ::-webkit-scrollbar-thumb:hover,
+    [data-testid="stDataFrame"] *::-webkit-scrollbar-thumb:hover,
+    [class*="dvn-"]::-webkit-scrollbar-thumb:hover,
+    [class*="dvn-"] *::-webkit-scrollbar-thumb:hover {
+        background: #1D4ED8 !important;
+    }
+
+    /* ==========================================================================
+       BOTÓN DESCARGAR EXCEL LLAMATIVO EN AZUL
+       ========================================================================== */
+    div.stDownloadButton button {
+        background: linear-gradient(135deg, #1D4ED8 0%, #2563EB 50%, #0284C7 100%) !important;
+        color: #FFFFFF !important;
+        font-weight: 700 !important;
+        font-size: 1.05rem !important;
+        border: none !important;
+        border-radius: 8px !important;
+        padding: 10px 24px !important;
+        box-shadow: 0 4px 14px rgba(37, 99, 235, 0.45) !important;
+        transition: all 0.25s ease-in-out !important;
+    }
+
+    div.stDownloadButton button:hover {
+        background: linear-gradient(135deg, #1E40AF 0%, #1D4ED8 50%, #0369A1 100%) !important;
+        color: #FFFFFF !important;
+        box-shadow: 0 6px 20px rgba(37, 99, 235, 0.65) !important;
+        transform: translateY(-2px) !important;
+    }
+
+    div.stDownloadButton button:active {
+        transform: translateY(1px) !important;
+        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4) !important;
+    }
+
+    div.stDownloadButton button p {
+        color: #FFFFFF !important;
+        font-weight: 700 !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# ------------------------------------------------------------------------------
+# 2. CARGA Y PREPROCESAMIENTO DE DATOS CON CACHÉ
+# ------------------------------------------------------------------------------
+def clean_col(c):
+    nfkd = unicodedata.normalize('NFKD', str(c))
+    return ''.join([ch for ch in nfkd if not unicodedata.combining(ch)]).lower().strip()
+
+@st.cache_data(show_spinner=False)
+def load_raw_data():
+    sociedades = [
+        ('MLAR', 'PARTIDAS MLAR.xlsx'),
+        ('MMAR', 'PARTIDAS MMAR.xlsx')
+    ]
+    
+    docs_list = []
+    
+    for soc, fpath in sociedades:
+        if not os.path.exists(fpath):
+            st.warning(f"Archivo {fpath} no encontrado en el directorio de trabajo.")
+            continue
+            
+        raw = pd.read_excel(fpath, sheet_name='Data')
+        raw = raw.rename(columns={c: clean_col(c) for c in raw.columns})
+        
+        # Filtrar filas de totales o vacías en columnas clave
+        key_cols = ['documento compras', 'posicion', 'clave contabiliz.']
+        raw = raw.dropna(subset=key_cols).copy()
+        
+        raw['Sociedad'] = soc
+        
+        # Mapear columnas estandarizadas
+        raw['Pedido'] = raw['documento compras'].astype(np.int64).astype(str)
+        raw['Posicion'] = raw['posicion'].astype(int).astype(str)
+        raw['Key'] = soc + '_' + raw['Pedido'] + '_' + raw['Posicion']
+        
+        # Importe contable
+        raw['Importe'] = pd.to_numeric(raw['importe en moneda local'], errors='coerce').fillna(0.0)
+        raw['Moneda'] = raw.get('moneda local', pd.Series('ARS', index=raw.index)).fillna('ARS')
+        
+        # Claves y clases
+        raw['Clave_Contab'] = raw['clave contabiliz.'].astype(int).astype(str)
+        raw['Clase_Doc'] = raw.get('clase de documento', pd.Series('', index=raw.index)).fillna('').astype(str).str.strip()
+        raw['Doc_SAP'] = raw.get('no documento', pd.Series('', index=raw.index)).fillna(0).astype(np.int64).astype(str)
+        
+        # Fechas
+        raw['Fecha_Doc'] = pd.to_datetime(raw.get('fecha de documento'), errors='coerce', dayfirst=True)
+        raw['Fecha_Emision_OC'] = pd.to_datetime(raw.get('fecha emision oc'), errors='coerce', dayfirst=True)
+        raw['Fecha_Entrega_OC'] = pd.to_datetime(raw.get('fecha entrega oc'), errors='coerce', dayfirst=True)
+        raw['Fecha_Aprobacion_OC'] = pd.to_datetime(raw.get('fecha aprobacion final oc'), errors='coerce', dayfirst=True)
+        raw['Primera_Fecha_Entrega_OC'] = pd.to_datetime(raw.get('primera fecha entrega oc'), errors='coerce', dayfirst=True)
+        
+        # Proveedor y Operadores
+        raw['Proveedor'] = raw.get('proveedor', pd.Series('', index=raw.index)).fillna(raw.get('nombre', '')).fillna('DESCONOCIDO').astype(str).str.strip()
+        raw['Operador_OC'] = raw.get('operador oc', pd.Series('', index=raw.index)).fillna('SIN ASIGNAR').astype(str).str.strip()
+        raw['Operador_VA'] = raw.get('operador de va', pd.Series('', index=raw.index)).fillna('SIN ASIGNAR').astype(str).str.strip()
+        
+        # División y Grupo de Compras
+        raw['Division'] = raw.get('division', pd.Series('S/D', index=raw.index)).fillna('S/D').astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+        raw['Grupo_Compras'] = raw.get('grupo de compra oc', pd.Series('SIN GRUPO', index=raw.index)).fillna('SIN GRUPO').astype(str).str.strip()
+        
+        docs_list.append(raw)
+        
+    if not docs_list:
+        return pd.DataFrame()
+        
+    full_docs = pd.concat(docs_list, ignore_index=True)
+    return full_docs
+
+def build_grouped_positions(df_docs, today_date):
+    if df_docs.empty:
+        return pd.DataFrame()
+        
+    def first_valid(series, default=''):
+        for val in series:
+            if pd.notna(val) and str(val).strip() not in ['', 'None', 'nan', 'DESCONOCIDO', 'SIN ASIGNAR', 'SIN GRUPO']:
+                return str(val).strip()
+        return default
+
+    def join_divisions(series):
+        divs = sorted(set(str(x).strip() for x in series if pd.notna(x) and str(x).strip() not in ['', 'S/D', 'nan']))
+        return '/'.join(divs) if divs else 'S/D'
+
+    grouped = df_docs.groupby(['Sociedad', 'Pedido', 'Posicion']).agg(
+        Proveedor=('Proveedor', lambda s: first_valid(s, 'DESCONOCIDO')),
+        Operador_OC=('Operador_OC', lambda s: first_valid(s, 'SIN ASIGNAR')),
+        Operador_VA=('Operador_VA', lambda s: first_valid(s, 'SIN ASIGNAR')),
+        Division=('Division', join_divisions),
+        Grupo_Compras=('Grupo_Compras', lambda s: first_valid(s, 'SIN GRUPO')),
+        Fecha_Emision_OC=('Fecha_Emision_OC', 'first'),
+        Fecha_Entrega_OC=('Fecha_Entrega_OC', 'first'),
+        Fecha_Aprobacion_OC=('Fecha_Aprobacion_OC', 'first'),
+        Cant_Docs=('Clase_Doc', 'count'),
+        Total_Debe=('Importe', lambda s: s[s > 0].sum()),
+        Total_Haber=('Importe', lambda s: s[s < 0].sum()),
+        Saldo_Neto=('Importe', 'sum'),
+        Clases_Doc=('Clase_Doc', lambda s: ', '.join(sorted(set(str(x) for x in s if x)))),
+        Fecha_Min_Doc=('Fecha_Doc', 'min'),
+        Fecha_Max_Doc=('Fecha_Doc', 'max')
+    ).reset_index()
+
+    grouped['Total_Debe'] = grouped['Total_Debe'].round(2)
+    grouped['Total_Haber'] = grouped['Total_Haber'].round(2)
+    grouped['Saldo_Neto'] = grouped['Saldo_Neto'].round(2)
+    grouped['Key'] = grouped['Sociedad'] + '_' + grouped['Pedido'] + '_' + grouped['Posicion']
+
+    # Diagnósticos contables EM/RF
+    def diag_emrf(r):
+        saldo = r['Saldo_Neto']
+        debe = r['Total_Debe']
+        haber = r['Total_Haber']
+        if abs(saldo) < 0.01:
+            return 'COMPENSABLE (Saldo $0)'
+        elif saldo < 0:
+            if debe == 0:
+                return 'FALTA FACTURA (Solo Recepción)'
+            else:
+                return 'FALTA FACTURA (Recepción parcial sin facturar)'
+        else:
+            if haber == 0:
+                return 'FALTA RECEPCIÓN (Solo Factura)'
+            else:
+                return 'FALTA RECEPCIÓN (Factura mayor a Recepción)'
+
+    def group_emrf(diag):
+        if 'FALTA FACTURA' in diag:
+            return 'TIENE RECEPCIÓN - FALTA FACTURA'
+        elif 'FALTA RECEPCIÓN' in diag:
+            return 'TIENE FACTURA - FALTA RECEPCIÓN'
+        else:
+            return 'COMPENSABLE (Saldo $0)'
+
+    def venc_status(fec):
+        if pd.isna(fec):
+            return 'SIN FECHA OC'
+        elif fec < today_date:
+            return 'VENCIDA'
+        else:
+            return 'VIGENTE'
+
+    def dias_atraso(fec):
+        if pd.isna(fec):
+            return 0
+        delta = (today_date - fec).days
+        return delta if delta > 0 else 0
+
+    def calc_prioridad(r):
+        emrf = r['Grupo_EMRF']
+        venc = r['Estado_Vencimiento']
+        if emrf == 'TIENE FACTURA - FALTA RECEPCIÓN':
+            if venc == 'VENCIDA':
+                return '🔴 URGENTE: OC Vencida sin Recepción'
+            else:
+                return '🟠 Factura sin Recepción (En plazo)'
+        elif emrf == 'TIENE RECEPCIÓN - FALTA FACTURA':
+            if venc == 'VENCIDA':
+                return '🟡 RECLAMAR: OC Vencida sin Factura'
+            else:
+                return '🔵 Recepción en plazo (Pendiente Factura)'
+        else:
+            return '🟢 Listo para compensar (F.13)'
+
+    grouped['Diagnostico_EMRF'] = grouped.apply(diag_emrf, axis=1)
+    grouped['Grupo_EMRF'] = grouped['Diagnostico_EMRF'].apply(group_emrf)
+    grouped['Estado_Vencimiento'] = grouped['Fecha_Entrega_OC'].apply(venc_status)
+    grouped['Dias_Atraso'] = grouped['Fecha_Entrega_OC'].apply(dias_atraso)
+    grouped['Prioridad_Accion'] = grouped.apply(calc_prioridad, axis=1)
+
+    return grouped
+
+# Cargar datos
+with st.spinner("Cargando bases de datos de SAP (MLAR y MMAR)... "):
+    df_docs_all = load_raw_data()
+
+if df_docs_all.empty:
+    st.error("No se encontraron datos en los archivos PARTIDAS MLAR.xlsx y PARTIDAS MMAR.xlsx.")
+    st.stop()
+
+# ------------------------------------------------------------------------------
+# 3. BARRA LATERAL (SIDEBAR) - FILTROS OPERATIVOS
+# ------------------------------------------------------------------------------
+st.sidebar.title("Panel de Control")
+
+# Filtro 1: Selección de Sociedad / Base de Datos
+soc_options = ["Todas (Consolidado)", "MLAR", "MMAR"]
+sel_soc = st.sidebar.selectbox("Base de Datos / Sociedad:", soc_options, index=0)
+
+if sel_soc == "MLAR":
+    df_docs = df_docs_all[df_docs_all['Sociedad'] == 'MLAR'].copy()
+elif sel_soc == "MMAR":
+    df_docs = df_docs_all[df_docs_all['Sociedad'] == 'MMAR'].copy()
+else:
+    df_docs = df_docs_all.copy()
+
+# Fecha de corte automática al día actual
+corte_timestamp = pd.Timestamp.now().normalize()
+
+# Construir agrupaciones basadas en la fecha de corte
+df_pos = build_grouped_positions(df_docs, corte_timestamp)
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("Filtros de Búsqueda")
+
+# Buscador unificado: Pedido o Proveedor
+search_query = st.sidebar.text_input("Buscar Pedido o Proveedor:", placeholder="Ej: 4500121598 o AURELIA").strip()
+
+# Filtro 2: Estado Contable EM/RF
+emrf_all = ["TIENE RECEPCIÓN - FALTA FACTURA", "TIENE FACTURA - FALTA RECEPCIÓN", "COMPENSABLE (Saldo $0)"]
+sel_emrf = st.sidebar.multiselect("Estado Contable EM/RF:", emrf_all, default=["TIENE RECEPCIÓN - FALTA FACTURA"])
+
+# Filtro 3: Grupo de Compras
+grupos_disp = sorted([g for g in df_pos['Grupo_Compras'].unique() if g != 'SIN GRUPO'])
+default_grupos = [g for g in ["C01", "C07"] if g in grupos_disp]
+sel_grupos = st.sidebar.multiselect("Grupo de Compras OC:", grupos_disp, default=default_grupos)
+
+# Filtro 4: Estado de Vencimiento
+venc_all = ["VENCIDA", "VIGENTE", "SIN FECHA OC"]
+sel_venc = st.sidebar.multiselect("Vencimiento de OC:", venc_all, default=[])
+
+# Filtro 5: Proveedor
+proveedores_disponibles = sorted([p for p in df_pos['Proveedor'].unique() if p != 'DESCONOCIDO'])
+sel_prov = st.sidebar.multiselect("Proveedor:", proveedores_disponibles, default=[])
+
+# Filtro 6: Operador de Compras OC
+operadores_oc = sorted([o for o in df_pos['Operador_OC'].unique() if o != 'SIN ASIGNAR'])
+sel_oper_oc = st.sidebar.multiselect("Operador Compras (OC):", operadores_oc, default=[])
+
+# Filtro 7: Operador de VA (Verificación Facturas)
+operadores_va = sorted([o for o in df_pos['Operador_VA'].unique() if o != 'SIN ASIGNAR'])
+sel_oper_va = st.sidebar.multiselect("Operador Verif. Factura (VA):", operadores_va, default=[])
+
+# Filtro 8: Slider de Días de Atraso
+max_dias = int(df_pos['Dias_Atraso'].max()) if not df_pos.empty else 0
+sel_dias_min = st.sidebar.slider("Días de Atraso mínimos:", min_value=0, max_value=max(max_dias, 1), value=0, step=15)
+
+# APLICAR FILTROS
+filtered = df_pos.copy()
+
+if search_query:
+    q = search_query.lower()
+    filtered = filtered[
+        filtered['Pedido'].str.lower().str.contains(q, na=False) |
+        filtered['Proveedor'].str.lower().str.contains(q, na=False)
+    ]
+
+if sel_emrf:
+    filtered = filtered[filtered['Grupo_EMRF'].isin(sel_emrf)]
+
+if sel_venc:
+    filtered = filtered[filtered['Estado_Vencimiento'].isin(sel_venc)]
+
+if sel_prov:
+    filtered = filtered[filtered['Proveedor'].isin(sel_prov)]
+
+if sel_oper_oc:
+    filtered = filtered[filtered['Operador_OC'].isin(sel_oper_oc)]
+
+if sel_oper_va:
+    filtered = filtered[filtered['Operador_VA'].isin(sel_oper_va)]
+
+if sel_grupos:
+    filtered = filtered[filtered['Grupo_Compras'].isin(sel_grupos)]
+
+if sel_dias_min > 0:
+    filtered = filtered[filtered['Dias_Atraso'] >= sel_dias_min]
+
+# Sidebar summary
+st.sidebar.markdown("---")
+pct_filtrado = (len(filtered) / len(df_pos)) * 100 if len(df_pos) > 0 else 0
+st.sidebar.markdown(f"**Posiciones seleccionadas:** {len(filtered):,d} / {len(df_pos):,d} (`{pct_filtrado:.1f}%`)")
+st.sidebar.markdown(f"**Saldo Neto Total:** `${filtered['Saldo_Neto'].sum():,.2f}` ARS")
+
+# ------------------------------------------------------------------------------
+# 4. ENCABEZADO
+# ------------------------------------------------------------------------------
+soc_badge = f"<span style='background:#1B365D; color:white; padding:4px 10px; border-radius:12px; font-size:0.85rem;'>{sel_soc}</span>"
+st.markdown(f"<div class='main-title'>Control de Partidas Abiertas SAP - Cuenta EM/RF {soc_badge}</div>", unsafe_allow_html=True)
+st.markdown(f"<div class='sub-title'>Cuenta de Compensación <b>2101011001</b> | Corte al <b>{corte_timestamp.strftime('%d/%m/%Y')}</b> | Fuentes: <b>PARTIDAS MLAR.xlsx</b> y <b>PARTIDAS MMAR.xlsx</b></div>", unsafe_allow_html=True)
+
+# ------------------------------------------------------------------------------
+# 5. TABLA DE TODAS LAS POSICIONES
+# ------------------------------------------------------------------------------
+st.markdown(f"### 📑 Todas las Posiciones ({len(filtered):,d})")
+
+cols_display = [
+    'Sociedad', 'Pedido', 'Posicion', 'Proveedor', 'Grupo_Compras',
+    'Operador_OC', 'Operador_VA',
+    'Fecha_Entrega_OC', 'Dias_Atraso', 'Estado_Vencimiento',
+    'Total_Debe', 'Total_Haber', 'Saldo_Neto',
+    'Cant_Docs', 'Clases_Doc'
+]
+
+# Configuración visual para st.dataframe
+col_config_dict = {
+    'Total_Debe': st.column_config.NumberColumn("Facturado (Debe)", format="$ %.2f"),
+    'Total_Haber': st.column_config.NumberColumn("Recepcionado (Haber)", format="$ %.2f"),
+    'Saldo_Neto': st.column_config.NumberColumn("Saldo Neto", format="$ %.2f"),
+    'Fecha_Entrega_OC': st.column_config.DateColumn("Fecha Entrega OC", format="DD/MM/YYYY"),
+    'Dias_Atraso': st.column_config.NumberColumn("Días Atraso", format="%d"),
+    'Cant_Docs': st.column_config.NumberColumn("Asientos", format="%d"),
+    'Operador_OC': st.column_config.TextColumn("Operador OC"),
+    'Operador_VA': st.column_config.TextColumn("Operador VA")
+}
+
+st.dataframe(
+    filtered[cols_display],
+    column_config=col_config_dict,
+    width='stretch',
+    height=420
+)
+st.caption(f"Mostrando {len(filtered):,d} posiciones filtradas | Puedes desplazarte verticalmente hacia abajo con la rueda del mouse o la barra azul lateral.")
+
+# ------------------------------------------------------------------------------
+# 6. EXPORTACIÓN A EXCEL
+# ------------------------------------------------------------------------------
+st.markdown("---")
+c_exp1, c_exp2 = st.columns([3, 1])
+
+with c_exp1:
+    st.markdown("**Exportar Reporte a Excel:** Descarga un archivo con las posiciones filtradas y las columnas visibles.")
+
+with c_exp2:
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        filtered[cols_display].to_excel(writer, index=False, sheet_name='Posiciones_Filtradas')
+    excel_bytes = output.getvalue()
+    
+    timestamp_str = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    st.download_button(
+        label="📥 Descargar Reporte en Excel",
+        data=excel_bytes,
+        file_name=f"CONTROL_EM_RF_{sel_soc}_{timestamp_str}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        width='stretch',
+        type='primary'
+    )
