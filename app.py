@@ -13,6 +13,7 @@ import os
 import json
 import plotly.express as px
 import plotly.graph_objects as go
+from openpyxl.worksheet.table import Table, TableStyleInfo
 
 # ------------------------------------------------------------------------------
 # 1. CONFIGURACIÓN DE PÁGINA Y ESTILOS
@@ -530,6 +531,8 @@ df_excel = filtered[cols_display].rename(columns=rename_cols_excel).copy()
 with pd.ExcelWriter(output, engine='openpyxl') as writer:
     df_excel.to_excel(writer, index=False, sheet_name='Posiciones_Filtradas')
     ws = writer.sheets['Posiciones_Filtradas']
+    
+    # 1. Formatear fechas como DD/MM/YYYY
     date_cols = ['FE CONT.', 'FE OC']
     for col_name in date_cols:
         if col_name in df_excel.columns:
@@ -538,6 +541,47 @@ with pd.ExcelWriter(output, engine='openpyxl') as writer:
                 cell = ws.cell(row=row_idx, column=col_idx)
                 if cell.value is not None:
                     cell.number_format = 'DD/MM/YYYY'
+                    
+    # 2. Formatear valores monetarios
+    curr_cols = ['Facturado (Debe)', 'Recepcionado (Haber)', 'Saldo_Neto']
+    for col_name in curr_cols:
+        if col_name in df_excel.columns:
+            col_idx = list(df_excel.columns).index(col_name) + 1
+            for row_idx in range(2, len(df_excel) + 2):
+                cell = ws.cell(row=row_idx, column=col_idx)
+                if cell.value is not None and isinstance(cell.value, (int, float)):
+                    cell.number_format = '$ #,##0.00'
+
+    # 3. Formato oficial de Tabla de Excel con estilo azul y filtros
+    if len(df_excel) > 0:
+        tab = Table(displayName="PartidasAbiertas", ref=ws.dimensions)
+        style = TableStyleInfo(
+            name="TableStyleMedium9",
+            showFirstColumn=False,
+            showLastColumn=False,
+            showRowStripes=True,
+            showColumnStripes=False
+        )
+        tab.tableStyleInfo = style
+        ws.add_table(tab)
+
+    # 4. Autoajustar el ancho de cada columna para que se lea todo el texto sin recortar
+    for col in ws.columns:
+        col_letter = col[0].column_letter
+        max_len = 0
+        for cell in col:
+            if cell.value is not None:
+                val = str(cell.value)
+                if cell.number_format == 'DD/MM/YYYY':
+                    val = 'DD/MM/YYYY'
+                elif '$' in str(cell.number_format):
+                    try:
+                        val = f'$ {float(cell.value):,.2f}'
+                    except Exception:
+                        pass
+                max_len = max(max_len, len(val))
+        ws.column_dimensions[col_letter].width = max(max_len + 4, 12)
+
 excel_bytes = output.getvalue()
 timestamp_str = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
 
