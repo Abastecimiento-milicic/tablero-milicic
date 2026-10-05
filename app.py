@@ -16,6 +16,12 @@ import plotly.graph_objects as go
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
 # ------------------------------------------------------------------------------
+# CONFIGURACIÓN MANUAL: FECHA DE ACTUALIZACIÓN DEL REPORTE
+# Modifica esta variable si deseas escribir la fecha directamente en el código:
+# ------------------------------------------------------------------------------
+FECHA_ACTUALIZACION_MANUAL = "05/10/2026"
+
+# ------------------------------------------------------------------------------
 # 1. CONFIGURACIÓN DE PÁGINA Y ESTILOS
 # ------------------------------------------------------------------------------
 st.set_page_config(
@@ -381,6 +387,43 @@ def build_grouped_positions(df_docs, today_date):
 
     return grouped
 
+# ==============================================================================
+# GUÍA Y EXPLICACIÓN GENERAL (Comentado temporalmente por solicitud del usuario)
+# Descomentar este bloque y las llamadas en sidebar/encabezado cuando se desee reactivar.
+# ==============================================================================
+# def render_general_explanation():
+#     st.markdown("### 📘 Guía y Explicación General")
+#     st.markdown("""
+#     **¿Qué analiza este tablero?**  
+#     Supervisa la cuenta puente de SAP **EM/RF (`2101011001`)**, conciliando lo ingresado físicamente en almacén/planta (**MIGO**) contra lo facturado por el proveedor (**MIRO**).
+# 
+#     ---
+#     #### 📌 ¿Qué significan los pedidos según su estado?
+#     * 📦 **TIENE RECEPCIÓN - FALTA FACTURA:**  
+#       El almacén ya recepcionó la mercadería o servicio (*Recepcionado Haber* con saldo negativo), pero el proveedor aún no facturó o la factura no fue cargada (*Facturado Debe* en `$0,00`).  
+#       👉 **Acción:** Reclamar la factura al proveedor o gestionar la contabilización en Cuentas por Pagar.
+# 
+#     * 📄 **TIENE FACTURA - FALTA RECEPCIÓN:**  
+#       La factura del proveedor ya fue contabilizada en SAP (*Facturado Debe* positivo), pero en el almacén no consta el ingreso de mercadería o remito (*Recepcionado Haber* en `$0,00`).  
+#       👉 **Acción:** Reclamar el remito o ingreso físico al almacén/planta para evitar riesgo de pagar sin recibir.
+# 
+#     * 🟢 **COMPENSABLE (Saldo $0):**  
+#       Lo facturado coincide exactamente con lo recepcionado (Saldo Neto `$0,00`).  
+#       👉 **Acción:** Listo para depurar y cerrar en SAP mediante la transacción **`F.13`**.
+# 
+#     ---
+#     #### ⚠️ Aclaración sobre la columna «ESTADO»
+#     La columna **ESTADO** de la tabla indica el cumplimiento de la **fecha de entrega pactada** (`FE OC`):
+#     * **VENCIDA:** La fecha prometida de entrega del pedido ya expiró respecto a la fecha actual.
+#     * **VIGENTE:** El pedido aún se encuentra en plazo para su entrega.  
+#     *(Nota: Esta columna mide el vencimiento de la fecha de entrega del pedido, no si le falta factura o recepción; eso se consulta en el filtro de Estado Contable EM/RF).*
+# 
+#     ---
+#     #### ⚙️ Filtros iniciales (al abrir el sistema)
+#     * Por defecto, la aplicación muestra únicamente pedidos con **«TIENE RECEPCIÓN - FALTA FACTURA»** correspondientes a los Grupos de Compras **C01 y C07**.
+#     * Podés cambiar el estado o quitar los grupos de compras desde el **Panel de Control (menú lateral izquierdo)** para ver el universo completo o ver los que les falta recepción.
+#     """)
+
 # Cargar datos
 with st.spinner("Cargando bases de datos de SAP (MLAR y MMAR)... "):
     df_docs_all = load_raw_data()
@@ -394,6 +437,17 @@ if df_docs_all.empty:
 # ------------------------------------------------------------------------------
 st.sidebar.title("Panel de Control")
 
+# [EXPLICACIÓN GENERAL COMENTADA TEMPORALMENTE - Descomentar para reactivar]
+# with st.sidebar.popover("ℹ️ Explicación General", help="Haz clic para ver la guía y cómo interpretar los pedidos"):
+#     render_general_explanation()
+
+# Fecha de actualización escrita a mano (editable en pantalla o en la constante de código)
+fecha_actualizacion = st.sidebar.text_input(
+    "📅 Fecha de Actualización:",
+    value=FECHA_ACTUALIZACION_MANUAL,
+    help="Ingresa la fecha de corte/actualización a mano (formato DD/MM/AAAA o texto)."
+).strip()
+
 # Filtro 1: Selección de Sociedad / Base de Datos
 soc_options = ["Todas (Consolidado)", "MLAR", "MMAR"]
 sel_soc = st.sidebar.selectbox("Base de Datos / Sociedad:", soc_options, index=0)
@@ -405,8 +459,13 @@ elif sel_soc == "MMAR":
 else:
     df_docs = df_docs_all.copy()
 
-# Fecha de corte automática al día actual
-corte_timestamp = pd.Timestamp.now().normalize()
+# Fecha de corte basada en la fecha ingresada a mano (para cálculo de vencimientos y días de atraso)
+try:
+    corte_timestamp = pd.to_datetime(fecha_actualizacion, dayfirst=True)
+    if pd.isna(corte_timestamp):
+        corte_timestamp = pd.Timestamp.now().normalize()
+except Exception:
+    corte_timestamp = pd.Timestamp.now().normalize()
 
 # Construir agrupaciones basadas en la fecha de corte
 df_pos = build_grouped_positions(df_docs, corte_timestamp)
@@ -488,7 +547,11 @@ st.sidebar.markdown(f"**Saldo Neto Total:** `${filtered['Saldo_Neto'].sum():,.2f
 # ------------------------------------------------------------------------------
 soc_badge = f"<span style='background:#1B365D; color:white; padding:4px 10px; border-radius:12px; font-size:0.85rem;'>{sel_soc}</span>"
 st.markdown(f"<div class='main-title'>Control de Partidas Abiertas SAP - Cuenta EM/RF {soc_badge}</div>", unsafe_allow_html=True)
-st.markdown(f"<div class='sub-title'>Cuenta de Compensación <b>2101011001</b> | Corte al <b>{corte_timestamp.strftime('%d/%m/%Y')}</b> | Fuentes: <b>PARTIDAS MLAR.xlsx</b> y <b>PARTIDAS MMAR.xlsx</b></div>", unsafe_allow_html=True)
+st.markdown(f"<div class='sub-title'>Cuenta de Compensación <b>2101011001</b> | Fecha de Actualización: <b>{fecha_actualizacion}</b> | Fuentes: <b>PARTIDAS MLAR.xlsx</b> y <b>PARTIDAS MMAR.xlsx</b></div>", unsafe_allow_html=True)
+
+# [EXPLICACIÓN GENERAL COMENTADA TEMPORALMENTE - Descomentar para reactivar el botón de ayuda en el encabezado]
+# with st.popover("ℹ️ Explicación General", help="Haz clic para ver la guía y cómo interpretar los pedidos"):
+#     render_general_explanation()
 
 # ------------------------------------------------------------------------------
 # 5. TABLA DE TODAS LAS POSICIONES Y DESCARGA
