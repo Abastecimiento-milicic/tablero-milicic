@@ -1,4 +1,4 @@
-# 📊 Control de Partidas Abiertas SAP - Cuenta EM/RF (MLAR & MMAR)
+# 📊 Control de Partidas Abiertas SAP - Cuenta EM/RF (MLAR, MMAR, U003 & U365)
 
 Aplicación web desarrollada en **Streamlit** para el análisis, conciliación y control operativo de la cuenta de compensación de compras **EM/RF (Entrada de Mercancías / Recepción de Facturas - Cuenta `2101011001`)** en SAP (Transacción **FBL3N**), cruzada con las Órdenes de Compra (OC) y sus fechas comprometidas de entrega.
 
@@ -6,11 +6,13 @@ Aplicación web desarrollada en **Streamlit** para el análisis, conciliación y
 
 ## 💾 Bases de Datos Integradas
 
-La aplicación utiliza como fuentes de datos directas dos archivos Excel en la raíz del proyecto:
-1. **`PARTIDAS MLAR.xlsx`**: Datos contables y de compras correspondientes a **MLAR** (2.880 partidas contables, 2.113 posiciones de OC).
-2. **`PARTIDAS MMAR.xlsx`**: Datos contables y de compras correspondientes a **MMAR** (765 partidas contables, 483 posiciones de OC).
+La aplicación utiliza como fuentes de datos directas cuatro archivos Excel en la raíz del proyecto:
+1. **`PARTIDAS MLAR.xlsx`**: Datos contables y de compras correspondientes a **MLAR**.
+2. **`PARTIDAS MMAR.xlsx`**: Datos contables y de compras correspondientes a **MMAR**.
+3. **`PARTIDAS U003.xlsx`**: Datos contables y de compras correspondientes a **U003**.
+4. **`PARTIDAS U365.xlsx`**: Datos contables y de compras correspondientes a **U365**.
 
-Ambas bases pueden ser analizadas de manera **Consolidada (Todas)** o filtrando específicamente por **MLAR** o **MMAR** desde el panel lateral.
+Todas las bases pueden ser analizadas de manera **Consolidada (Todas)** o filtrando específicamente por sociedad (**MLAR**, **MMAR**, **U003** o **U365**) desde el panel lateral.
 
 ---
 
@@ -66,6 +68,8 @@ El script iniciará el servidor de Streamlit y abrirá automáticamente tu naveg
 ├── INICIAR_DASHBOARD.bat          # Lanzador automático de un solo clic para Windows
 ├── PARTIDAS MLAR.xlsx             # Base de datos SAP para MLAR
 ├── PARTIDAS MMAR.xlsx             # Base de datos SAP para MMAR
+├── PARTIDAS U003.xlsx             # Base de datos SAP para U003
+├── PARTIDAS U365.xlsx             # Base de datos SAP para U365
 ├── .streamlit/
 │   └── config.toml                # Configuración de tema visual y servidor Streamlit
 ├── index.html                     # Versión estática autónoma anterior

@@ -1,6 +1,6 @@
 # ==============================================================================
 # CONTROL DE PARTIDAS ABIERTAS SAP - CUENTA EM/RF (2101011001)
-# Bases de Datos: PARTIDAS MLAR.xlsx y PARTIDAS MMAR.xlsx
+# Bases de Datos: PARTIDAS MLAR, MMAR, U003 y U365 (.xlsx)
 # ==============================================================================
 
 import streamlit as st
@@ -25,7 +25,7 @@ FECHA_ACTUALIZACION_MANUAL = "05/10/2026"
 # 1. CONFIGURACIÓN DE PÁGINA Y ESTILOS
 # ------------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Control EM/RF SAP - MLAR y MMAR",
+    page_title="Control EM/RF SAP - MLAR, MMAR, U003 y U365",
     page_icon="⚖️",
     layout="wide",
     initial_sidebar_state="auto"
@@ -198,7 +198,9 @@ def load_raw_data():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     sociedades = [
         ('MLAR', os.path.join(base_dir, 'PARTIDAS MLAR.xlsx')),
-        ('MMAR', os.path.join(base_dir, 'PARTIDAS MMAR.xlsx'))
+        ('MMAR', os.path.join(base_dir, 'PARTIDAS MMAR.xlsx')),
+        ('U003', os.path.join(base_dir, 'PARTIDAS U003.xlsx')),
+        ('U365', os.path.join(base_dir, 'PARTIDAS U365.xlsx'))
     ]
     
     op_map = {}
@@ -255,11 +257,23 @@ def load_raw_data():
         prov_series = raw.get('nombre', raw.get('proveedor', raw.get('proveedor/centro suministrador', pd.Series('', index=raw.index))))
         raw['Proveedor'] = prov_series.fillna('DESCONOCIDO').astype(str).str.strip()
         
-        # Operador OC: usar columna si existe con datos, o buscar en op_map
-        if 'operador oc' in raw.columns and raw['operador oc'].dropna().astype(str).str.strip().ne('').any():
-            raw['Operador_OC'] = raw['operador oc'].fillna(raw['Key'].map(op_map)).fillna('SIN ASIGNAR').astype(str).str.strip()
-        elif 'operador_oc' in raw.columns and raw['operador_oc'].dropna().astype(str).str.strip().ne('').any():
-            raw['Operador_OC'] = raw['operador_oc'].fillna(raw['Key'].map(op_map)).fillna('SIN ASIGNAR').astype(str).str.strip()
+        # Operador OC: última columna de la base de datos ('OPERADOR DE OC', 'OPERADOR DE CO', 'OPERADOR OC')
+        op_candidates = [
+            'operador de oc', 'operador de co', 'operador oc', 'operador_oc',
+            'operador_co', 'operador co', 'operador'
+        ]
+        col_operador_oc = None
+        for cand in op_candidates:
+            if cand in raw.columns:
+                col_operador_oc = cand
+                break
+                
+        # Si no se encontró por nombre explícito, usar la última columna de la base de datos
+        if col_operador_oc is None and len(raw.columns) > 0:
+            col_operador_oc = raw.columns[-1]
+
+        if col_operador_oc is not None and col_operador_oc in raw.columns:
+            raw['Operador_OC'] = raw[col_operador_oc].fillna(raw['Key'].map(op_map)).fillna('SIN ASIGNAR').astype(str).str.strip()
         else:
             raw['Operador_OC'] = raw['Key'].map(op_map).fillna('SIN ASIGNAR').astype(str).str.strip()
             
@@ -425,11 +439,11 @@ def build_grouped_positions(df_docs, today_date):
 #     """)
 
 # Cargar datos
-with st.spinner("Cargando bases de datos de SAP (MLAR y MMAR)... "):
+with st.spinner("Cargando bases de datos de SAP (MLAR, MMAR, U003, U365)... "):
     df_docs_all = load_raw_data()
 
 if df_docs_all.empty:
-    st.error("No se encontraron datos en los archivos PARTIDAS MLAR.xlsx y PARTIDAS MMAR.xlsx.")
+    st.error("No se encontraron datos en los archivos de bases de datos SAP (MLAR, MMAR, U003, U365).")
     st.stop()
 
 # ------------------------------------------------------------------------------
@@ -449,15 +463,14 @@ fecha_actualizacion = st.sidebar.text_input(
 ).strip()
 
 # Filtro 1: Selección de Sociedad / Base de Datos
-soc_options = ["Todas (Consolidado)", "MLAR", "MMAR"]
+soc_disponibles = sorted(df_docs_all['Sociedad'].unique())
+soc_options = ["Todas (Consolidado)"] + soc_disponibles
 sel_soc = st.sidebar.selectbox("Base de Datos / Sociedad:", soc_options, index=0)
 
-if sel_soc == "MLAR":
-    df_docs = df_docs_all[df_docs_all['Sociedad'] == 'MLAR'].copy()
-elif sel_soc == "MMAR":
-    df_docs = df_docs_all[df_docs_all['Sociedad'] == 'MMAR'].copy()
-else:
+if sel_soc == "Todas (Consolidado)":
     df_docs = df_docs_all.copy()
+else:
+    df_docs = df_docs_all[df_docs_all['Sociedad'] == sel_soc].copy()
 
 # Fecha de corte basada en la fecha ingresada a mano (para cálculo de vencimientos y días de atraso)
 try:
@@ -547,7 +560,7 @@ st.sidebar.markdown(f"**Saldo Neto Total:** `${filtered['Saldo_Neto'].sum():,.2f
 # ------------------------------------------------------------------------------
 soc_badge = f"<span style='background:#1B365D; color:white; padding:4px 10px; border-radius:12px; font-size:0.85rem;'>{sel_soc}</span>"
 st.markdown(f"<div class='main-title'>Control de Partidas Abiertas SAP - Cuenta EM/RF {soc_badge}</div>", unsafe_allow_html=True)
-st.markdown(f"<div class='sub-title'>Cuenta de Compensación <b>2101011001</b> | Fecha de Actualización: <b>{fecha_actualizacion}</b> | Fuentes: <b>PARTIDAS MLAR.xlsx</b> y <b>PARTIDAS MMAR.xlsx</b></div>", unsafe_allow_html=True)
+st.markdown(f"<div class='sub-title'>Cuenta de Compensación <b>2101011001</b> | Fecha de Actualización: <b>{fecha_actualizacion}</b> | Fuentes: <b>MLAR, MMAR, U003 y U365</b></div>", unsafe_allow_html=True)
 
 # [EXPLICACIÓN GENERAL COMENTADA TEMPORALMENTE - Descomentar para reactivar el botón de ayuda en el encabezado]
 # with st.popover("ℹ️ Explicación General", help="Haz clic para ver la guía y cómo interpretar los pedidos"):
